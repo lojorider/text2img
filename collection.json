@@ -1,0 +1,141 @@
+{
+  "info": {
+    "name": "Text2Img API",
+    "description": "AI image generation API using Cloudflare Workers AI (FLUX-1-Schnell)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3210",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "health"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Generate Image (Base64)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Thai restaurant interior, modern design\",\n  \"size\": \"1024x1024\",\n  \"steps\": 4,\n  \"guidance\": 7.5,\n  \"quality\": 85,\n  \"outputFormat\": \"png\",\n  \"enhancePrompt\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/generate?format=base64",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "generate"],
+          "query": [
+            {
+              "key": "format",
+              "value": "base64"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Generate Image (Binary)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Appetizing Thai green curry dish\",\n  \"size\": \"512x512\",\n  \"outputFormat\": \"jpg\",\n  \"quality\": 90,\n  \"style\": \"food\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/generate?format=binary",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "generate"],
+          "query": [
+            {
+              "key": "format",
+              "value": "binary"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Generate with Responsive Variants",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Modern restaurant hero banner\",\n  \"size\": \"1920x1080\",\n  \"outputFormat\": \"webp\",\n  \"responsive\": true,\n  \"responsiveSizes\": [480, 768, 1024, 1920],\n  \"style\": \"hero\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/generate?format=base64",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "generate"],
+          "query": [
+            {
+              "key": "format",
+              "value": "base64"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Generate Icon (Small, Optimized)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Food menu category icon, Thai cuisine\",\n  \"size\": \"512x512\",\n  \"outputFormat\": \"png\",\n  \"optimize\": true,\n  \"resize\": \"128x128\",\n  \"style\": \"icon\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/generate?format=base64",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "generate"],
+          "query": [
+            {
+              "key": "format",
+              "value": "base64"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

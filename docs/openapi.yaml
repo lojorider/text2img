@@ -1,0 +1,180 @@
+openapi: 3.0.3
+info:
+  title: Text2Img API
+  description: AI image generation API using Cloudflare Workers AI (FLUX-1-Schnell)
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3210
+    description: Local development
+
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  service:
+                    type: string
+                    example: text2img
+
+  /api/generate:
+    post:
+      summary: Generate image from text prompt
+      operationId: generateImage
+      parameters:
+        - name: format
+          in: query
+          description: Response format
+          schema:
+            type: string
+            enum: [base64, binary]
+            default: base64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt:
+                  type: string
+                  description: Text prompt for image generation
+                  example: Thai restaurant interior, modern design
+                size:
+                  type: string
+                  description: Image dimensions (WxH)
+                  default: 1024x1024
+                  example: 1024x1024
+                steps:
+                  type: integer
+                  description: Number of diffusion steps
+                  default: 4
+                  minimum: 1
+                  maximum: 20
+                guidance:
+                  type: number
+                  description: Guidance scale
+                  default: 7.5
+                quality:
+                  type: integer
+                  description: Output quality (1-100)
+                  default: 85
+                  minimum: 1
+                  maximum: 100
+                optimize:
+                  type: boolean
+                  description: Apply image optimizations
+                  default: false
+                outputFormat:
+                  type: string
+                  enum: [png, jpg, webp]
+                  default: png
+                resize:
+                  type: string
+                  nullable: true
+                  description: Resize dimensions (WxH)
+                  example: 512x512
+                responsive:
+                  type: boolean
+                  description: Generate responsive variants
+                  default: false
+                responsiveSizes:
+                  type: array
+                  items:
+                    type: integer
+                  default: [480, 768, 1024, 1920]
+                enhancePrompt:
+                  type: boolean
+                  description: Auto-enhance prompt with context modifiers
+                  default: true
+                style:
+                  type: string
+                  description: Style hint for prompt enhancement
+                  enum: [hero, icon, category, food, menu, pos, tablet, staff, waiter, interior, dining]
+      responses:
+        '200':
+          description: Image generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      image:
+                        type: string
+                        description: Base64-encoded image
+                      format:
+                        type: string
+                        example: png
+                      width:
+                        type: integer
+                        example: 1024
+                      height:
+                        type: integer
+                        example: 1024
+                      prompt:
+                        type: string
+                      enhancedPrompt:
+                        type: string
+                      variants:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            width:
+                              type: integer
+                            image:
+                              type: string
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
