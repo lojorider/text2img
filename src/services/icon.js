@@ -149,29 +149,89 @@ async function processAppIcon(sourceBuffer, targetSize, options = {}) {
 }
 
 /**
- * Menu Bar Icon: resize → greyscale → padding → PNG
+ * Menu Bar Icon: auto-trim → threshold die-cut → black silhouette on transparent
+ *
+ * macOS template image: black pixels with alpha on transparent background.
+ * macOS will tint the icon automatically for light/dark mode.
+ *
+ * Pipeline:
+ *   1. Auto-trim excess background
+ *   2. Resize content to fill icon area
+ *   3. Convert to greyscale
+ *   4. Threshold to create binary mask (content = white, bg = black)
+ *   5. Use mask as alpha channel of solid black image → silhouette
  */
 async function processMenuBarIcon(sourceBuffer, targetSize, options = {}) {
-  const padding = options.padding ?? 0;
-  const bg = { r: 0, g: 0, b: 0, alpha: 0 };
+  const contentFill = options.contentFill ?? 0.85;
 
-  const paddingPx = Math.round(targetSize * padding);
-  const innerSize = targetSize - paddingPx * 2;
+  // 1. Auto-trim to get tight content bounds
+  const trimResult = await autoTrim(sourceBuffer);
 
-  let buf = await sharp(sourceBuffer)
-    .ensureAlpha()
-    .resize(innerSize, innerSize, { fit: 'cover', position: 'center' })
-    .greyscale()
+  // 2. Resize trimmed content to fill the icon area
+  const contentSize = Math.round(targetSize * contentFill);
+  const marginPx = Math.round((targetSize - contentSize) / 2);
+
+  let resized = await sharp(trimResult.buffer)
+    .resize(contentSize, contentSize, {
+      fit: 'contain',
+      position: 'center',
+      background: trimResult.bg,
+    })
     .toBuffer();
 
-  buf = await sharp(buf)
+  // Extend to full target size
+  resized = await sharp(resized)
     .extend({
-      top: paddingPx,
-      bottom: paddingPx,
-      left: paddingPx,
-      right: paddingPx,
-      background: bg,
+      top: marginPx,
+      bottom: targetSize - contentSize - marginPx,
+      left: marginPx,
+      right: targetSize - contentSize - marginPx,
+      background: trimResult.bg,
     })
+    .toBuffer();
+
+  // 3. Convert to greyscale
+  const grey = await sharp(resized)
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  // 4. Detect background luminance from top-left pixel, then threshold
+  const bgLuma = grey.data[0];
+  const bgIsBright = bgLuma > 128;
+
+  // Create alpha mask: content pixels → opaque (255), background → transparent (0)
+  const alphaMask = Buffer.alloc(grey.data.length);
+  for (let i = 0; i < grey.data.length; i++) {
+    const diff = Math.abs(grey.data[i] - bgLuma);
+    // Pixels that differ from background by more than threshold are content
+    alphaMask[i] = diff > 40 ? 255 : 0;
+  }
+
+  // 5. Create solid black image + apply alpha mask → template image
+  const solidBlack = await sharp({
+    create: {
+      width: targetSize,
+      height: targetSize,
+      channels: 3,
+      background: { r: 0, g: 0, b: 0 },
+    },
+  })
+    .raw()
+    .toBuffer();
+
+  // Combine RGB (black) + Alpha (mask) into RGBA
+  const rgba = Buffer.alloc(targetSize * targetSize * 4);
+  for (let i = 0; i < targetSize * targetSize; i++) {
+    rgba[i * 4] = 0;              // R
+    rgba[i * 4 + 1] = 0;          // G
+    rgba[i * 4 + 2] = 0;          // B
+    rgba[i * 4 + 3] = alphaMask[i]; // A
+  }
+
+  const buf = await sharp(rgba, {
+    raw: { width: targetSize, height: targetSize, channels: 4 },
+  })
     .png({ compressionLevel: 9 })
     .toBuffer();
 
