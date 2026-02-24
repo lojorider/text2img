@@ -4,6 +4,7 @@ import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import generateRouter from './routes/generate.js';
+import iconRouter from './routes/icon.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,10 +21,31 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'text2img' });
+app.get('/', (_req, res) => {
+  const pkg = { name: 'text2img', version: '1.0.0' };
+  res.json({
+    name: pkg.name,
+    version: pkg.version,
+    description: 'Express API for AI image generation using Cloudflare Workers AI (FLUX-1-Schnell)',
+    status: 'running',
+    endpoints: {
+      health: '/api/health',
+      generate: 'POST /api/generate',
+      generateIcon: 'POST /api/generate/icon',
+      docs: '/docs/openapi.yaml',
+    },
+    documentation: `/docs/openapi.yaml`,
+  });
 });
 
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', service: 'text2img', uptime: process.uptime() });
+});
+
+// Serve OpenAPI spec
+app.use('/docs', express.static(path.join(__dirname, '../docs')));
+
+app.use('/api/generate/icon', iconRouter);
 app.use('/api/generate', generateRouter);
 
 // Error handling

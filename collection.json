@@ -136,6 +136,122 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "Icon: App Icon Set",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"modern restaurant logo with fork and flame\",\n  \"preset\": \"appIcon\",\n  \"cornerRadius\": 0.22,\n  \"padding\": 0.1\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/generate/icon",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "generate", "icon"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Icon: Menu Bar",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"a bell notification icon\",\n  \"preset\": \"menuBar\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/generate/icon",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "generate", "icon"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Icon: Favicon / Web Icons",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"a star logo, bright yellow\",\n  \"preset\": \"favicon\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/generate/icon",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "generate", "icon"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Icon: All Presets",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"a fork and knife logo\",\n  \"preset\": \"all\",\n  \"background\": \"transparent\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/generate/icon",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "generate", "icon"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Icon: All Presets (ZIP Download)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"a fork and knife logo\",\n  \"preset\": \"all\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/generate/icon?format=zip",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "generate", "icon"],
+          "query": [
+            {
+              "key": "format",
+              "value": "zip"
+            }
+          ]
+        }
+      },
+      "response": []
     }
   ]
 }

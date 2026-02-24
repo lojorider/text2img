@@ -155,19 +155,76 @@ paths:
                 type: string
                 format: binary
         '400':
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  error:
-                    type: string
+          $ref: '#/components/responses/BadRequest'
         '500':
-          description: Server error
+          $ref: '#/components/responses/ServerError'
+
+  /api/generate/icon:
+    post:
+      summary: Generate icon set from text prompt
+      operationId: generateIconSet
+      parameters:
+        - name: format
+          in: query
+          description: Response format (base64 JSON or ZIP download)
+          schema:
+            type: string
+            enum: [base64, zip]
+            default: base64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt, preset]
+              properties:
+                prompt:
+                  type: string
+                  description: Text prompt for icon generation
+                  example: modern restaurant logo with fork and flame
+                preset:
+                  type: string
+                  description: Icon preset type
+                  enum: [appIcon, menuBar, favicon, all]
+                  example: appIcon
+                size:
+                  type: string
+                  description: AI canvas dimensions
+                  default: 1024x1024
+                steps:
+                  type: integer
+                  description: Number of diffusion steps
+                  default: 4
+                  minimum: 1
+                  maximum: 20
+                guidance:
+                  type: number
+                  description: Guidance scale
+                  default: 7.5
+                enhancePrompt:
+                  type: boolean
+                  description: Auto-enhance prompt with icon-specific modifiers
+                  default: true
+                background:
+                  type: string
+                  description: "Background color: 'transparent' or hex (e.g. '#FF6600')"
+                  default: transparent
+                cornerRadius:
+                  type: number
+                  description: Corner radius ratio for appIcon (Apple standard ~0.22)
+                  default: 0.22
+                  minimum: 0
+                  maximum: 0.5
+                padding:
+                  type: number
+                  description: Padding ratio around icon content
+                  default: 0.1
+                  minimum: 0
+                  maximum: 0.5
+      responses:
+        '200':
+          description: Icon set generated successfully
           content:
             application/json:
               schema:
@@ -175,6 +232,72 @@ paths:
                 properties:
                   success:
                     type: boolean
-                    example: false
-                  error:
-                    type: string
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      prompt:
+                        type: string
+                      enhancedPrompt:
+                        type: string
+                      preset:
+                        type: string
+                        example: appIcon
+                      icons:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              example: app-icon-1024.png
+                            label:
+                              type: string
+                              example: App Icon 1024x1024
+                            width:
+                              type: integer
+                              example: 1024
+                            height:
+                              type: integer
+                              example: 1024
+                            format:
+                              type: string
+                              example: png
+                            image:
+                              type: string
+                              description: Base64-encoded image
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+components:
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+    ServerError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
