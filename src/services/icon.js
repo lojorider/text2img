@@ -47,15 +47,15 @@ export const ICON_PRESETS = {
 // ─── Prompt Enhancement ─────────────────────────────────────────────
 
 const ICON_PROMPT_COMMON =
-  'single centered object, clean minimal design, no text, no background clutter, vector-like sharp edges';
+  'single object filling most of the canvas, clean minimal design, no text, no background clutter, vector-like sharp edges, square image with sharp square corners, no rounded corners';
 
 const PRESET_PROMPT_HINTS = {
   appIcon:
-    'modern app icon style, glossy subtle gradient, centered symbol on solid color background',
+    'modern app icon style, large symbol filling 80 percent of the frame, glossy subtle gradient, solid color background, perfectly square edges, no border, no rounded corners',
   menuBar:
-    'simple monochrome symbol, minimal line art, template icon style, black on transparent background',
+    'simple monochrome symbol, large and bold filling the frame, minimal line art, template icon style, black on transparent background, square edges',
   favicon:
-    'simple recognizable symbol, works at very small sizes, high contrast, bold shapes',
+    'large bold symbol filling the frame, works at very small sizes, high contrast, bold shapes, square edges, no border, no rounded corners',
 };
 
 export function enhanceIconPrompt(prompt, preset) {
@@ -77,29 +77,56 @@ export function parseColor(hex) {
 // ─── Sharp Pipelines ────────────────────────────────────────────────
 
 /**
- * App Icon: resize → padding → SVG rounded mask → PNG
+ * Auto-trim: remove uniform background, detect bg color, return trimmed buffer + bg color
+ */
+async function autoTrim(sourceBuffer) {
+  // Sample the top-left pixel as background color
+  const { data, info } = await sharp(sourceBuffer)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const bgR = data[0], bgG = data[1], bgB = data[2];
+
+  // Trim excess background
+  const trimmed = await sharp(sourceBuffer)
+    .trim({ threshold: 30 })
+    .toBuffer({ resolveWithObject: true });
+
+  return {
+    buffer: trimmed.data,
+    width: trimmed.info.width,
+    height: trimmed.info.height,
+    bg: { r: bgR, g: bgG, b: bgB, alpha: 1 },
+  };
+}
+
+/**
+ * App Icon: auto-trim → resize content to fill → SVG rounded mask → PNG
  */
 async function processAppIcon(sourceBuffer, targetSize, options = {}) {
   const cornerRadius = options.cornerRadius ?? 0.22;
-  const padding = options.padding ?? 0.1;
-  const bg = parseColor(options.background);
+  const contentFill = options.contentFill ?? 0.85; // content fills 85% of icon area
 
-  const paddingPx = Math.round(targetSize * padding);
-  const innerSize = targetSize - paddingPx * 2;
+  // Auto-trim to find content bounds and bg color
+  const trimResult = await autoTrim(sourceBuffer);
+  const bg = trimResult.bg;
 
-  // Resize source to inner size
-  let buf = await sharp(sourceBuffer)
+  // Content area = percentage of target size
+  const contentSize = Math.round(targetSize * contentFill);
+  const marginPx = Math.round((targetSize - contentSize) / 2);
+
+  // Resize trimmed content to fill the content area
+  let buf = await sharp(trimResult.buffer)
     .ensureAlpha()
-    .resize(innerSize, innerSize, { fit: 'cover', position: 'center' })
+    .resize(contentSize, contentSize, { fit: 'contain', position: 'center', background: bg })
     .toBuffer();
 
-  // Add padding
+  // Extend to full target size with bg color
   buf = await sharp(buf)
     .extend({
-      top: paddingPx,
-      bottom: paddingPx,
-      left: paddingPx,
-      right: paddingPx,
+      top: marginPx,
+      bottom: targetSize - contentSize - marginPx,
+      left: marginPx,
+      right: targetSize - contentSize - marginPx,
       background: bg,
     })
     .toBuffer();
@@ -125,7 +152,7 @@ async function processAppIcon(sourceBuffer, targetSize, options = {}) {
  * Menu Bar Icon: resize → greyscale → padding → PNG
  */
 async function processMenuBarIcon(sourceBuffer, targetSize, options = {}) {
-  const padding = options.padding ?? 0.1;
+  const padding = options.padding ?? 0;
   const bg = { r: 0, g: 0, b: 0, alpha: 0 };
 
   const paddingPx = Math.round(targetSize * padding);
@@ -155,7 +182,7 @@ async function processMenuBarIcon(sourceBuffer, targetSize, options = {}) {
  * Web Icon: resize → padding → PNG
  */
 async function processWebIcon(sourceBuffer, targetSize, options = {}) {
-  const padding = options.padding ?? 0.1;
+  const padding = options.padding ?? 0;
   const bg = parseColor(options.background);
 
   const paddingPx = Math.round(targetSize * padding);

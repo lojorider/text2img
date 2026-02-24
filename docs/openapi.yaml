@@ -219,7 +219,7 @@ paths:
                 padding:
                   type: number
                   description: Padding ratio around icon content
-                  default: 0.1
+                  default: 0
                   minimum: 0
                   maximum: 0.5
       responses:

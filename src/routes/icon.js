@@ -22,7 +22,7 @@ router.post('/', async (req, res, next) => {
       enhancePrompt: doEnhance = true,
       background = 'transparent',
       cornerRadius = 0.22,
-      padding = 0.1,
+      padding = 0,
     } = req.body;
 
     // ── Validation ──────────────────────────────────────────────
