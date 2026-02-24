@@ -161,7 +161,12 @@ paths:
 
   /api/generate/icon:
     post:
-      summary: Generate icon set from text prompt
+      summary: Generate icon set from text prompt with auto-trim die-cut
+      description: |
+        Generates a complete icon set from an AI-generated image. The pipeline
+        auto-trims excess background, resizes content to fill the icon area,
+        and applies die-cut rounded corners (appIcon). Prompt is automatically
+        enhanced with icon-specific modifiers for optimal results.
       operationId: generateIconSet
       parameters:
         - name: format
@@ -222,6 +227,12 @@ paths:
                   default: 0
                   minimum: 0
                   maximum: 0.5
+                contentFill:
+                  type: number
+                  description: How much of the icon area the content should fill (appIcon only, used after auto-trim)
+                  default: 0.85
+                  minimum: 0.5
+                  maximum: 1.0
       responses:
         '200':
           description: Icon set generated successfully

@@ -23,6 +23,7 @@ router.post('/', async (req, res, next) => {
       background = 'transparent',
       cornerRadius = 0.22,
       padding = 0,
+      contentFill = 0.85,
     } = req.body;
 
     // ── Validation ──────────────────────────────────────────────
@@ -61,6 +62,7 @@ router.post('/', async (req, res, next) => {
       background,
       cornerRadius,
       padding,
+      contentFill,
     });
 
     // ── Response ────────────────────────────────────────────────
