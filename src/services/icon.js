@@ -14,12 +14,17 @@ export const ICON_PRESETS = {
   },
   menuBar: {
     label: 'Menu Bar Icon',
+    aiSize: '512x512',  // generate AI image at 512px (less detail)
     sizes: [
-      { size: 16, suffix: '' },
+      { size: 512, suffix: '-512' },
+      { size: 256, suffix: '-256' },
+      { size: 128, suffix: '-128' },
+      { size: 64, suffix: '-64' },
       { size: 32, suffix: '@2x' },
+      { size: 16, suffix: '' },
     ],
-    nameTemplate: (entry) => `menubar-${entry.size}${entry.suffix}.png`,
-    labelTemplate: (entry) => `Menu Bar ${entry.size}x${entry.size}${entry.suffix}`,
+    nameTemplate: (entry) => `menubar${entry.suffix}.png`,
+    labelTemplate: (entry) => `Menu Bar ${entry.size}x${entry.size}`,
   },
   favicon: {
     label: 'Favicon / Web Icons',
@@ -53,12 +58,18 @@ const PRESET_PROMPT_HINTS = {
   appIcon:
     'modern app icon style, large symbol filling 80 percent of the frame, glossy subtle gradient, solid color background, perfectly square edges, no border, no rounded corners',
   menuBar:
-    'simple monochrome symbol, large and bold filling the frame, minimal line art, template icon style, black on transparent background, square edges',
+    'black silhouette on pure white background, solid black icon shape, no gradients, no shading, no grey, only pure black and pure white, flat vector style, bold simple shape',
   favicon:
     'large bold symbol filling the frame, works at very small sizes, high contrast, bold shapes, square edges, no border, no rounded corners',
 };
 
+const MENUBAR_PROMPT_COMMON =
+  'single simple object filling most of the canvas, very minimal detail, no fine details, no text, no background clutter, black silhouette icon on white background, monochrome, no color, must work at very small sizes';
+
 export function enhanceIconPrompt(prompt, preset) {
+  if (preset === 'menuBar') {
+    return `${prompt}, ${MENUBAR_PROMPT_COMMON}, ${PRESET_PROMPT_HINTS.menuBar}`;
+  }
   const hint = PRESET_PROMPT_HINTS[preset] || PRESET_PROMPT_HINTS.appIcon;
   return `${prompt}, ${ICON_PROMPT_COMMON}, ${hint}`;
 }
@@ -149,27 +160,30 @@ async function processAppIcon(sourceBuffer, targetSize, options = {}) {
 }
 
 /**
- * Menu Bar Icon: auto-trim → threshold die-cut → black silhouette on transparent
+ * Menu Bar Icon: die-cut at high resolution, then downscale
  *
  * macOS template image: black pixels with alpha on transparent background.
  * macOS will tint the icon automatically for light/dark mode.
  *
- * Pipeline:
+ * Pipeline (at RENDER_SIZE, not target):
  *   1. Auto-trim excess background
- *   2. Resize content to fill icon area
- *   3. Convert to greyscale
- *   4. Threshold to create binary mask (content = white, bg = black)
- *   5. Use mask as alpha channel of solid black image → silhouette
+ *   2. Resize content to fill render area (512px)
+ *   3. Convert to greyscale → threshold → alpha mask
+ *   4. Build black silhouette on transparent at 512px
+ *   5. Downscale to target size (16/32px) with antialiasing
  */
+const MENUBAR_RENDER_SIZE = 512; // die-cut at this resolution for clean edges
+
 async function processMenuBarIcon(sourceBuffer, targetSize, options = {}) {
   const contentFill = options.contentFill ?? 0.85;
+  const renderSize = MENUBAR_RENDER_SIZE;
 
   // 1. Auto-trim to get tight content bounds
   const trimResult = await autoTrim(sourceBuffer);
 
-  // 2. Resize trimmed content to fill the icon area
-  const contentSize = Math.round(targetSize * contentFill);
-  const marginPx = Math.round((targetSize - contentSize) / 2);
+  // 2. Resize trimmed content to fill the render area (high-res)
+  const contentSize = Math.round(renderSize * contentFill);
+  const marginPx = Math.round((renderSize - contentSize) / 2);
 
   let resized = await sharp(trimResult.buffer)
     .resize(contentSize, contentSize, {
@@ -179,59 +193,44 @@ async function processMenuBarIcon(sourceBuffer, targetSize, options = {}) {
     })
     .toBuffer();
 
-  // Extend to full target size
   resized = await sharp(resized)
     .extend({
       top: marginPx,
-      bottom: targetSize - contentSize - marginPx,
+      bottom: renderSize - contentSize - marginPx,
       left: marginPx,
-      right: targetSize - contentSize - marginPx,
+      right: renderSize - contentSize - marginPx,
       background: trimResult.bg,
     })
     .toBuffer();
 
-  // 3. Convert to greyscale
+  // 3. Greyscale → threshold → alpha mask (all at 512px)
   const grey = await sharp(resized)
     .greyscale()
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  // 4. Detect background luminance from top-left pixel, then threshold
   const bgLuma = grey.data[0];
-  const bgIsBright = bgLuma > 128;
 
-  // Create alpha mask: content pixels → opaque (255), background → transparent (0)
   const alphaMask = Buffer.alloc(grey.data.length);
   for (let i = 0; i < grey.data.length; i++) {
     const diff = Math.abs(grey.data[i] - bgLuma);
-    // Pixels that differ from background by more than threshold are content
     alphaMask[i] = diff > 40 ? 255 : 0;
   }
 
-  // 5. Create solid black image + apply alpha mask → template image
-  const solidBlack = await sharp({
-    create: {
-      width: targetSize,
-      height: targetSize,
-      channels: 3,
-      background: { r: 0, g: 0, b: 0 },
-    },
-  })
-    .raw()
-    .toBuffer();
-
-  // Combine RGB (black) + Alpha (mask) into RGBA
-  const rgba = Buffer.alloc(targetSize * targetSize * 4);
-  for (let i = 0; i < targetSize * targetSize; i++) {
+  // 4. Build RGBA silhouette at render size (512px)
+  const rgba = Buffer.alloc(renderSize * renderSize * 4);
+  for (let i = 0; i < renderSize * renderSize; i++) {
     rgba[i * 4] = 0;              // R
     rgba[i * 4 + 1] = 0;          // G
     rgba[i * 4 + 2] = 0;          // B
     rgba[i * 4 + 3] = alphaMask[i]; // A
   }
 
+  // 5. Downscale from 512px → target size with Lanczos antialiasing
   const buf = await sharp(rgba, {
-    raw: { width: targetSize, height: targetSize, channels: 4 },
+    raw: { width: renderSize, height: renderSize, channels: 4 },
   })
+    .resize(targetSize, targetSize, { kernel: 'lanczos3' })
     .png({ compressionLevel: 9 })
     .toBuffer();
 

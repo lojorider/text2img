@@ -42,28 +42,52 @@ router.post('/', async (req, res, next) => {
       });
     }
 
-    // ── Generate AI image ───────────────────────────────────────
+    // ── Generate AI image(s) ─────────────────────────────────────
 
-    // Use icon-specific prompt enhancement
-    const finalPrompt = doEnhance
-      ? enhanceIconPrompt(prompt, preset === 'all' ? 'appIcon' : preset)
-      : prompt;
+    const iconOptions = { background, cornerRadius, padding, contentFill };
+    let icons = [];
+    const enhancedPrompts = {};
 
-    const genResult = await generateImage(finalPrompt, {
-      size,
-      steps,
-      guidance,
-      enhancePrompt: false, // already enhanced above
-    });
+    // menuBar uses 512px AI canvas (less detail), others use user-specified size
+    const menuBarSize = ICON_PRESETS.menuBar.aiSize || '512x512';
 
-    // ── Process icon set ────────────────────────────────────────
+    if (preset === 'all') {
+      // Generate 2 images: color @ full size, B&W @ 512px
+      const colorPrompt = doEnhance ? enhanceIconPrompt(prompt, 'appIcon') : prompt;
+      const monoPrompt = doEnhance ? enhanceIconPrompt(prompt, 'menuBar') : prompt;
+      enhancedPrompts.color = colorPrompt;
+      enhancedPrompts.menuBar = monoPrompt;
 
-    const icons = await generateIconSet(genResult.imageBuffer, preset, {
-      background,
-      cornerRadius,
-      padding,
-      contentFill,
-    });
+      const [colorResult, monoResult] = await Promise.all([
+        generateImage(colorPrompt, { size, steps, guidance, enhancePrompt: false }),
+        generateImage(monoPrompt, { size: menuBarSize, steps, guidance, enhancePrompt: false }),
+      ]);
+
+      const [appIcons, menuIcons, favIcons] = await Promise.all([
+        generateIconSet(colorResult.imageBuffer, 'appIcon', iconOptions),
+        generateIconSet(monoResult.imageBuffer, 'menuBar', iconOptions),
+        generateIconSet(colorResult.imageBuffer, 'favicon', iconOptions),
+      ]);
+      icons = [...appIcons, ...menuIcons, ...favIcons];
+    } else if (preset === 'menuBar') {
+      // menuBar: generate at 512px for simpler details
+      const finalPrompt = doEnhance ? enhanceIconPrompt(prompt, 'menuBar') : prompt;
+      enhancedPrompts.menuBar = finalPrompt;
+
+      const genResult = await generateImage(finalPrompt, {
+        size: menuBarSize, steps, guidance, enhancePrompt: false,
+      });
+      icons = await generateIconSet(genResult.imageBuffer, 'menuBar', iconOptions);
+    } else {
+      // appIcon / favicon: generate at user-specified size
+      const finalPrompt = doEnhance ? enhanceIconPrompt(prompt, preset) : prompt;
+      enhancedPrompts[preset] = finalPrompt;
+
+      const genResult = await generateImage(finalPrompt, {
+        size, steps, guidance, enhancePrompt: false,
+      });
+      icons = await generateIconSet(genResult.imageBuffer, preset, iconOptions);
+    }
 
     // ── Response ────────────────────────────────────────────────
 
@@ -76,10 +100,9 @@ router.post('/', async (req, res, next) => {
       return res.send(zipBuffer);
     }
 
-    // Default: base64 JSON
     const data = {
       prompt,
-      enhancedPrompt: finalPrompt,
+      enhancedPrompts,
       preset,
       icons: icons.map(({ buffer, ...meta }) => ({
         ...meta,
