@@ -9,6 +9,49 @@ servers:
     description: Local development
 
 paths:
+  /:
+    get:
+      summary: Service metadata
+      description: Returns service information, version, and available endpoints
+      operationId: getServiceInfo
+      responses:
+        '200':
+          description: Service metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: text2img
+                  version:
+                    type: string
+                    example: 1.0.0
+                  description:
+                    type: string
+                  status:
+                    type: string
+                    example: running
+                  endpoints:
+                    type: object
+                    properties:
+                      health:
+                        type: string
+                        example: /api/health
+                      generate:
+                        type: string
+                        example: POST /api/generate
+                      generateIcon:
+                        type: string
+                        example: POST /api/generate/icon
+                      docs:
+                        type: string
+                        example: /docs/openapi.yaml
+                  documentation:
+                    type: string
+                    example: /docs/openapi.yaml
+
   /api/health:
     get:
       summary: Health check
