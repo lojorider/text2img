@@ -105,19 +105,37 @@ export async function generateImage(prompt, options = {}) {
 export async function processImage(imageBuffer, options = {}) {
   const format = (options.outputFormat || 'png').toLowerCase();
   const quality = parseInt(options.quality) || 85;
+  const originalSize = imageBuffer.length;
+
+  // Detect input format from buffer
+  const inputMeta = await sharp(imageBuffer).metadata();
+  const inputFormat = inputMeta.format; // 'png', 'jpeg', 'webp', etc.
+
+  const needsResize = !!options.resize;
+  const needsFormatConvert = format !== inputFormat && !(format === 'jpg' && inputFormat === 'jpeg');
+  const opt = options.optimize;
+
+  // Skip re-encode if no transformation needed — return original buffer
+  if (!needsResize && !needsFormatConvert && !opt && !options.responsive) {
+    return {
+      buffer: imageBuffer,
+      format: inputFormat === 'jpeg' ? 'jpg' : inputFormat,
+      mimeType: getMimeType(format),
+      originalSize,
+      optimizedSize: originalSize,
+      savings: '0.0%',
+    };
+  }
 
   let processor = sharp(imageBuffer);
 
   // Resize if requested
-  if (options.resize) {
+  if (needsResize) {
     const [w, h] = options.resize.split('x').map(Number);
     processor = processor.resize(w, h || w, { fit: 'cover', position: 'center' });
   }
 
-  const originalSize = imageBuffer.length;
-
   // Apply format conversion (with extra optimization when optimize flag is set)
-  const opt = options.optimize;
   switch (format) {
     case 'webp':
       processor = processor.webp(opt
@@ -132,22 +150,29 @@ export async function processImage(imageBuffer, options = {}) {
       break;
     case 'png':
     default:
-      processor = processor.png(opt ? { compressionLevel: 9, palette: true } : {});
+      processor = processor.png(opt
+        ? { compressionLevel: 9, palette: true }
+        : { compressionLevel: 9 });
       break;
   }
 
   const outputBuffer = await processor.toBuffer();
   const optimizedSize = outputBuffer.length;
+
+  // Use the smaller of the two when same format and optimize didn't help
+  const useOriginal = !needsResize && !needsFormatConvert && optimizedSize >= originalSize;
+  const finalBuffer = useOriginal ? imageBuffer : outputBuffer;
+  const finalSize = useOriginal ? originalSize : optimizedSize;
   const savings = originalSize > 0
-    ? ((1 - optimizedSize / originalSize) * 100).toFixed(1)
+    ? ((1 - finalSize / originalSize) * 100).toFixed(1)
     : '0.0';
 
   const result = {
-    buffer: outputBuffer,
-    format,
+    buffer: finalBuffer,
+    format: format === 'jpeg' ? 'jpg' : format,
     mimeType: getMimeType(format),
     originalSize,
-    optimizedSize,
+    optimizedSize: finalSize,
     savings: `${savings}%`,
   };
 
