@@ -114,23 +114,42 @@ export async function processImage(imageBuffer, options = {}) {
     processor = processor.resize(w, h || w, { fit: 'cover', position: 'center' });
   }
 
-  // Apply format conversion
+  const originalSize = imageBuffer.length;
+
+  // Apply format conversion (with extra optimization when optimize flag is set)
+  const opt = options.optimize;
   switch (format) {
     case 'webp':
-      processor = processor.webp({ quality });
+      processor = processor.webp(opt
+        ? { quality, effort: 6, smartSubsample: true }
+        : { quality });
       break;
     case 'jpg':
     case 'jpeg':
-      processor = processor.jpeg({ quality, progressive: true });
+      processor = processor.jpeg(opt
+        ? { quality, progressive: true, mozjpeg: true }
+        : { quality, progressive: true });
       break;
     case 'png':
     default:
-      processor = processor.png(options.optimize ? { compressionLevel: 9 } : {});
+      processor = processor.png(opt ? { compressionLevel: 9, palette: true } : {});
       break;
   }
 
   const outputBuffer = await processor.toBuffer();
-  const result = { buffer: outputBuffer, format, mimeType: getMimeType(format) };
+  const optimizedSize = outputBuffer.length;
+  const savings = originalSize > 0
+    ? ((1 - optimizedSize / originalSize) * 100).toFixed(1)
+    : '0.0';
+
+  const result = {
+    buffer: outputBuffer,
+    format,
+    mimeType: getMimeType(format),
+    originalSize,
+    optimizedSize,
+    savings: `${savings}%`,
+  };
 
   // Generate responsive variants if requested
   if (options.responsive) {

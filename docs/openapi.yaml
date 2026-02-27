@@ -329,6 +329,139 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
 
+  /api/optimize:
+    post:
+      summary: Optimize an existing image
+      description: |
+        Resize, compress, and convert image format. Accepts both multipart
+        file upload and JSON with base64-encoded image.
+      operationId: optimizeImage
+      parameters:
+        - name: format
+          in: query
+          description: Response format
+          schema:
+            type: string
+            enum: [base64, binary]
+            default: base64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  description: Base64-encoded image
+                resize:
+                  type: object
+                  properties:
+                    width:
+                      type: integer
+                      example: 800
+                    height:
+                      type: integer
+                      example: 600
+                format:
+                  type: string
+                  enum: [png, jpg, jpeg, webp, avif]
+                  default: png
+                quality:
+                  type: integer
+                  description: Output quality (1-100)
+                  default: 80
+                  minimum: 1
+                  maximum: 100
+                fit:
+                  type: string
+                  enum: [cover, contain, fill, inside, outside]
+                  default: cover
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Image file to optimize
+                resize:
+                  type: string
+                  description: 'JSON string, e.g. {"width":800,"height":600}'
+                format:
+                  type: string
+                  enum: [png, jpg, jpeg, webp, avif]
+                  default: png
+                quality:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  default: 80
+                fit:
+                  type: string
+                  enum: [cover, contain, fill, inside, outside]
+                  default: cover
+      responses:
+        '200':
+          description: Image optimized successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      image:
+                        type: string
+                        description: Base64-encoded optimized image
+                      format:
+                        type: string
+                        example: webp
+                      width:
+                        type: integer
+                        example: 800
+                      height:
+                        type: integer
+                        example: 600
+                      originalSize:
+                        type: integer
+                        description: Original file size in bytes
+                        example: 524288
+                      optimizedSize:
+                        type: integer
+                        description: Optimized file size in bytes
+                        example: 102400
+                      savings:
+                        type: string
+                        description: Size reduction percentage
+                        example: '80.5%'
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/avif:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
 components:
   responses:
     BadRequest:

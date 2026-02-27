@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import generateRouter from './routes/generate.js';
 import iconRouter from './routes/icon.js';
+import optimizeRouter from './routes/optimize.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,7 +19,7 @@ const PORT = process.env.PORT || 3210;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // Routes
 app.get('/', (_req, res) => {
@@ -32,6 +33,7 @@ app.get('/', (_req, res) => {
       health: '/api/health',
       generate: 'POST /api/generate',
       generateIcon: 'POST /api/generate/icon',
+      optimize: 'POST /api/optimize',
       docs: '/docs/openapi.yaml',
     },
     documentation: `/docs/openapi.yaml`,
@@ -47,6 +49,7 @@ app.use('/docs', express.static(path.join(__dirname, '../docs')));
 
 app.use('/api/generate/icon', iconRouter);
 app.use('/api/generate', generateRouter);
+app.use('/api/optimize', optimizeRouter);
 
 // Error handling
 app.use((err, _req, res, _next) => {
