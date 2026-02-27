@@ -103,13 +103,18 @@ export async function generateImage(prompt, options = {}) {
 
 // Process image: format conversion, optimization, resize — returns buffer(s)
 export async function processImage(imageBuffer, options = {}) {
-  const format = (options.outputFormat || 'png').toLowerCase();
   const quality = parseInt(options.quality) || 85;
   const originalSize = imageBuffer.length;
 
   // Detect input format from buffer
   const inputMeta = await sharp(imageBuffer).metadata();
   const inputFormat = inputMeta.format; // 'png', 'jpeg', 'webp', etc.
+
+  // Default to input format instead of forcing PNG
+  const normalizeFormat = (f) => f === 'jpeg' ? 'jpg' : f;
+  const format = options.outputFormat
+    ? options.outputFormat.toLowerCase()
+    : normalizeFormat(inputFormat);
 
   const needsResize = !!options.resize;
   const needsFormatConvert = format !== inputFormat && !(format === 'jpg' && inputFormat === 'jpeg');

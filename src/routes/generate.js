@@ -12,7 +12,7 @@ router.post('/', async (req, res, next) => {
       guidance = 7.5,
       quality = 85,
       optimize = false,
-      outputFormat = 'png',
+      outputFormat,
       resize = null,
       responsive = false,
       responsiveSizes = [480, 768, 1024, 1920],
@@ -28,9 +28,9 @@ router.post('/', async (req, res, next) => {
       });
     }
 
-    // Validate outputFormat
+    // Validate outputFormat (if specified)
     const validFormats = ['png', 'jpg', 'jpeg', 'webp'];
-    if (!validFormats.includes(outputFormat.toLowerCase())) {
+    if (outputFormat && !validFormats.includes(outputFormat.toLowerCase())) {
       return res.status(400).json({
         success: false,
         error: `outputFormat must be one of: ${validFormats.join(', ')}`,
