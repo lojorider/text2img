@@ -122,8 +122,8 @@ paths:
                   default: false
                 outputFormat:
                   type: string
+                  description: "Output image format. Defaults to source format from AI (currently JPEG)."
                   enum: [png, jpg, webp]
-                  default: png
                 resize:
                   type: string
                   nullable: true
