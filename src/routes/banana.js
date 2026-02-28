@@ -162,6 +162,70 @@ router.post('/generate/icon', async (req, res, next) => {
   }
 });
 
+// ─── Edit Image via Gemini (send ref image + prompt) ────────────────
+
+router.post('/edit', upload.single('image'), async (req, res, next) => {
+  try {
+    // Accept image from file upload or base64 in JSON body
+    let imageBuffer;
+    let inputMime = 'image/png';
+
+    if (req.file) {
+      imageBuffer = req.file.buffer;
+      inputMime = req.file.mimetype;
+    } else if (req.body.image) {
+      imageBuffer = Buffer.from(req.body.image, 'base64');
+      inputMime = req.body.mimeType || 'image/png';
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'image is required (upload file or send base64 in body)',
+      });
+    }
+
+    const { prompt } = req.body;
+    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'prompt is required and must be a non-empty string',
+      });
+    }
+
+    const result = await editBananaImage(imageBuffer, prompt, { mimeType: inputMime });
+
+    // Optional post-processing
+    const { outputFormat, quality = 85, resize } = req.body;
+    const processed = await processImage(result.imageBuffer, {
+      outputFormat,
+      quality: parseInt(quality),
+      resize,
+    });
+
+    const format = req.query.format || 'base64';
+
+    if (format === 'binary') {
+      res.set('Content-Type', processed.mimeType);
+      res.set('Content-Disposition', `inline; filename="edited.${processed.format}"`);
+      return res.send(processed.buffer);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        image: processed.buffer.toString('base64'),
+        format: processed.format,
+        prompt,
+        text: result.text || null,
+        originalSize: processed.originalSize,
+        optimizedSize: processed.optimizedSize,
+        savings: processed.savings,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── Remove Background via Gemini ───────────────────────────────────
 
 router.post('/remove-bg', upload.single('image'), async (req, res, next) => {
