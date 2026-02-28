@@ -1,6 +1,8 @@
 import { Router } from 'express';
-import { generateBananaImage } from '../services/banana.js';
+import { generateBananaImage, editBananaImage } from '../services/banana.js';
+import multer from 'multer';
 import { processImage } from '../services/image.js';
+import sharp from 'sharp';
 import {
   enhanceIconPrompt,
   generateIconSet,
@@ -9,6 +11,7 @@ import {
 } from '../services/icon.js';
 
 const router = Router();
+const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
 const VALID_PRESETS = ['appIcon', 'menuBar', 'favicon', 'all'];
 
 router.post('/', async (req, res, next) => {
@@ -152,6 +155,95 @@ router.post('/generate/icon', async (req, res, next) => {
           ...meta,
           image: buffer.toString('base64'),
         })),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Remove Background via Gemini ───────────────────────────────────
+
+router.post('/remove-bg', upload.single('image'), async (req, res, next) => {
+  try {
+    // Accept image from file upload or base64 in JSON body
+    let imageBuffer;
+    let inputMime = 'image/png';
+
+    if (req.file) {
+      imageBuffer = req.file.buffer;
+      inputMime = req.file.mimetype;
+    } else if (req.body.image) {
+      imageBuffer = Buffer.from(req.body.image, 'base64');
+      inputMime = req.body.mimeType || 'image/png';
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'image is required (upload file or send base64 in body)',
+      });
+    }
+
+    // Ask Gemini to remove background
+    const result = await editBananaImage(
+      imageBuffer,
+      'Remove the background from this image completely. Replace the background with a solid bright green color (#00FF00). Keep only the main subject with clean precise edges. The green must be exactly #00FF00.',
+      { mimeType: inputMime }
+    );
+
+    // Use Sharp to chroma-key the green background → transparent
+    const { data, info } = await sharp(result.imageBuffer)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    // Sample corners to detect actual bg color Gemini used
+    const w = info.width;
+    const corners = [0, (w - 1) * 4, (w * (info.height - 1)) * 4, (w * info.height - 1) * 4];
+    let bgR = 0, bgG = 0, bgB = 0, count = 0;
+    for (const idx of corners) {
+      if (idx + 2 < data.length) {
+        bgR += data[idx]; bgG += data[idx + 1]; bgB += data[idx + 2];
+        count++;
+      }
+    }
+    bgR = Math.round(bgR / count);
+    bgG = Math.round(bgG / count);
+    bgB = Math.round(bgB / count);
+
+    const tolerance = 90;
+    for (let i = 0; i < data.length; i += 4) {
+      const dr = Math.abs(data[i] - bgR);
+      const dg = Math.abs(data[i + 1] - bgG);
+      const db = Math.abs(data[i + 2] - bgB);
+      const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+      if (dist < tolerance) {
+        data[i + 3] = 0; // fully transparent
+      } else if (dist < tolerance + 30) {
+        // Soft edge — partial transparency for antialiasing
+        data[i + 3] = Math.round(255 * (dist - tolerance) / 30);
+      }
+    }
+
+    const finalBuffer = await sharp(data, {
+      raw: { width: info.width, height: info.height, channels: 4 },
+    })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+
+    const format = req.query.format || 'base64';
+
+    if (format === 'binary') {
+      res.set('Content-Type', 'image/png');
+      res.set('Content-Disposition', 'inline; filename="removed-bg.png"');
+      return res.send(finalBuffer);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        image: finalBuffer.toString('base64'),
+        format: 'png',
+        text: result.text || null,
       },
     });
   } catch (err) {

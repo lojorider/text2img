@@ -37,6 +37,7 @@ app.get('/', (_req, res) => {
       optimize: 'POST /api/optimize',
       banana: 'POST /api/banana',
       bananaIcon: 'POST /api/banana/generate/icon',
+      bananaRemoveBg: 'POST /api/banana/remove-bg',
       docs: '/docs/openapi.yaml',
     },
     documentation: `/docs/openapi.yaml`,
