@@ -1,55 +1,23 @@
-import fetch from 'node-fetch';
+import { OpenRouter } from '@openrouter/sdk';
 
-// Generate image using Gemini 2.5 Flash Image via OpenRouter (Nano Banana)
-export async function generateBananaImage(prompt, options = {}) {
-  const { OPENROUTER_API_KEY } = process.env;
-
-  if (!OPENROUTER_API_KEY) {
+function getClient() {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
     throw new Error('Missing configuration: OPENROUTER_API_KEY required');
   }
+  return new OpenRouter({ apiKey });
+}
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'google/gemini-2.5-flash-image',
-      messages: [{ role: 'user', content: prompt }],
-      modalities: ['image', 'text'],
-    }),
-  });
+const MODEL = 'google/gemini-2.5-flash-image';
 
-  if (!response.ok) {
-    let message;
-    try {
-      const errJson = await response.json();
-      message = errJson?.error?.message || JSON.stringify(errJson);
-    } catch {
-      message = await response.text();
-    }
-    const err = new Error(message);
-    err.statusCode = response.status;
-    throw err;
-  }
-
-  const result = await response.json();
-  const choice = result.choices?.[0]?.message;
-
-  if (!choice) {
-    throw new Error('No content returned from OpenRouter API');
-  }
-
+function extractImage(message) {
   let imageBuffer = null;
   let mimeType = 'image/png';
-  let text = choice.content || '';
+  let text = message.content || '';
 
-  // Extract image from images array (base64 data URL format)
-  if (choice.images && choice.images.length > 0) {
-    const dataUrl = choice.images[0].image_url?.url;
+  if (message.images && message.images.length > 0) {
+    const dataUrl = message.images[0].imageUrl?.url;
     if (dataUrl) {
-      // Parse data:image/png;base64,... format
       const match = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
       if (match) {
         mimeType = match[1];
@@ -65,27 +33,37 @@ export async function generateBananaImage(prompt, options = {}) {
   return { imageBuffer, mimeType, text };
 }
 
-// Edit/transform an existing image using Gemini via OpenRouter
-export async function editBananaImage(imageBuffer, prompt, options = {}) {
-  const { OPENROUTER_API_KEY } = process.env;
+// Generate image using Gemini 3.1 Flash Image via OpenRouter SDK (Nano Banana)
+export async function generateBananaImage(prompt, options = {}) {
+  const openrouter = getClient();
 
-  if (!OPENROUTER_API_KEY) {
-    throw new Error('Missing configuration: OPENROUTER_API_KEY required');
+  const result = await openrouter.chat.send({
+    chatGenerationParams: {
+      model: MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      modalities: ['image', 'text'],
+    },
+  });
+
+  const message = result.choices?.[0]?.message;
+  if (!message) {
+    throw new Error('No content returned from OpenRouter API');
   }
 
-  // Encode image as base64 data URL
+  return extractImage(message);
+}
+
+// Edit/transform an existing image using Gemini via OpenRouter SDK
+export async function editBananaImage(imageBuffer, prompt, options = {}) {
+  const openrouter = getClient();
+
   const base64 = imageBuffer.toString('base64');
   const inputMime = options.mimeType || 'image/png';
   const dataUrl = `data:${inputMime};base64,${base64}`;
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'google/gemini-2.5-flash-image',
+  const result = await openrouter.chat.send({
+    chatGenerationParams: {
+      model: MODEL,
       messages: [{
         role: 'user',
         content: [
@@ -94,47 +72,13 @@ export async function editBananaImage(imageBuffer, prompt, options = {}) {
         ],
       }],
       modalities: ['image', 'text'],
-    }),
+    },
   });
 
-  if (!response.ok) {
-    let message;
-    try {
-      const errJson = await response.json();
-      message = errJson?.error?.message || JSON.stringify(errJson);
-    } catch {
-      message = await response.text();
-    }
-    const err = new Error(message);
-    err.statusCode = response.status;
-    throw err;
-  }
-
-  const result = await response.json();
-  const choice = result.choices?.[0]?.message;
-
-  if (!choice) {
+  const message = result.choices?.[0]?.message;
+  if (!message) {
     throw new Error('No content returned from OpenRouter API');
   }
 
-  let outBuffer = null;
-  let mimeType = 'image/png';
-  let text = choice.content || '';
-
-  if (choice.images && choice.images.length > 0) {
-    const outUrl = choice.images[0].image_url?.url;
-    if (outUrl) {
-      const match = outUrl.match(/^data:(image\/\w+);base64,(.+)$/);
-      if (match) {
-        mimeType = match[1];
-        outBuffer = Buffer.from(match[2], 'base64');
-      }
-    }
-  }
-
-  if (!outBuffer) {
-    throw new Error('No image returned by Gemini API via OpenRouter');
-  }
-
-  return { imageBuffer: outBuffer, mimeType, text };
+  return extractImage(message);
 }

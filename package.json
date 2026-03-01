@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.43.0",
+    "@openrouter/sdk": "^0.9.11",
     "archiver": "^7.0.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
